@@ -1,0 +1,93 @@
+---
+title: "Practical Machine Learning Course Project"
+author: "Bhasvita Katragadda"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+## Background
+
+Using wearable devices such as accelerometers, it is possible to collect detailed data on human movement. While people often quantify how much exercise they do, they rarely measure how well it is performed. In this project, data collected from accelerometers placed on the belt, forearm, arm, and dumbbell of six participants are used to predict the quality of barbell lifting exercises. The outcome variable, **classe**, represents five different execution styles.
+
+---
+
+## Data Loading
+
+```{r}
+library(caret)
+library(randomForest)
+
+set.seed(123)
+
+training <- read.csv("pml-training.csv")
+testing  <- read.csv("pml-testing.csv")
+```
+## Data Cleaning
+
+Columns containing missing values were removed. Additionally, non-predictive variables such as identifiers and timestamps were excluded from the dataset.
+
+```{r}
+# Remove columns with NA values (based on training set)
+na_cols <- colSums(is.na(training)) == 0
+training <- training[, na_cols]
+testing  <- testing[, na_cols]
+
+# Remove non-predictor columns
+training <- training[, -c(1:7)]
+testing  <- testing[, -c(1:7)]
+```
+## Cross Validation
+
+The dataset was split into training and validation sets using a 70/30 split to evaluate model performance and reduce overfitting.
+
+```{r}
+inTrain <- createDataPartition(training$classe, p = 0.7, list = FALSE)
+trainData <- training[inTrain, ]
+testData  <- training[-inTrain, ]
+trainData$classe <- as.factor(trainData$classe)
+
+```
+## Model Building
+
+A Random Forest model was selected due to its robustness and ability to handle a large number of predictors efficiently.
+
+```{r}
+rf_model <- randomForest(
+  x = trainData[, -which(names(trainData) == "classe")],
+  y = trainData$classe
+)
+```
+## Results
+
+Model performance was evaluated using a confusion matrix on the validation dataset.
+
+```{r}
+rf_predictions <- predict(
+  rf_model,
+  testData[, -which(names(testData) == "classe")]
+)
+
+# Make sure both are factors with same levels
+rf_predictions <- factor(rf_predictions, levels = levels(trainData$classe))
+testData$classe <- factor(testData$classe, levels = levels(trainData$classe))
+
+confusionMatrix(rf_predictions, testData$classe)
+```
+## Prediction on Test Data
+
+The trained model was applied to the 20 test cases provided for the course project.
+
+```{r}
+# Ensure testing data has same predictors as training
+testing_final <- testing[, colnames(trainData)[colnames(trainData) != "classe"]]
+
+# Remove any remaining NA values
+testing_final[is.na(testing_final)] <- 0
+
+# Predict
+final_predictions <- predict(rf_model, testing_final)
+final_predictions
+```
+## Conclusion
+
+A Random Forest model was used to predict the manner in which the weight lifting exercise was performed. Cross-validation was applied to reduce overfitting. The model achieved high accuracy, indicating a low expected out-of-sample error. Random Forest was chosen due to its robustness and ability to handle a large number of predictors effectively.
